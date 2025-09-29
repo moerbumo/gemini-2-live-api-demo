@@ -10,73 +10,42 @@ This is a simplified version of [Google's original React implementation](https:/
 
 ## Key Features
 
-- Real-time text chat with Gemini API
-- Audio input/output with visualization
-- Motion-detected video streaming
-- Screen sharing capabilities
-- Function calling support
+- Real-time chat with Gemini 2.0 Flash Multimodal Live API
+- Real-time audio responses from the model
+- Real-time audio input from the user, allowing interruptions
+- Real-time video streaming from the user's webcam
+- Real-time screen sharing from the user's screen
+- Function calling
+- Transcription of the model's audio (if Deepgram API key provided)
 - Built with vanilla JavaScript (no dependencies)
+- Mobile-friendly
 
 ## Prerequisites
 
 - Modern web browser with WebRTC, WebSocket, and Web Audio API support
 - Google AI Studio API key
-- Python 3.0+ OR `npx http-server` (for local development server)
+- `python -m http.server` or `npx http-server` or Live Server extension for VS Code (to host a server for index.html)
 
 ## Quick Start
 
-1. Clone the repository
-2. Set up your API key:
+1. Get your API key from Google AI Studio
+2. Clone the repository
 
    ```bash
-   cp js/config/config.example.js js/config/config.js
-   # Edit js/config/config.js with your API key
+   git clone https://github.com/ViaAnthroposBenevolentia/gemini-2-live-api-demo.git
    ```
 
-3. Start the development server:
+3. Start the development server (adjust port if needed):
 
    ```bash
-   python -m http.server 8000
-   ```
-
-   or 
-   
-   ```bash
-   npx http-server 8000
+   cd gemini-2-live-api-demo
+   python -m http.server 8000 # or npx http-server 8000 or Open with Live Server extension for VS Code
    ```
 
 4. Access the application at `http://localhost:8000`
 
-## Project Structure
-
-```plaintext
-├── js/
-│ ├── audio/ # Audio processing and management
-│ ├── config/ # Configuration files
-│ ├── core/ # Core functionality (WebSocket, worklets)
-│ ├── tools/ # Function calling implementations
-│ ├── utils/ # Utility functions
-│ ├── video/ # Video and screen sharing
-│ └── main.js # Application entry point
-├── css/ # Styling
-└── index.html # Main HTML file
-```
-
-## Usage Guide
-
-1. Click "Connect" to establish API connection
-2. Use the interface to:
-   - Send text messages
-   - Toggle microphone for audio input
-   - Enable webcam for video streaming
-   - Share your screen
-3. Monitor the logs panel for real-time feedback
-
-## Development
-
-### Adding Custom Tools
-
-Custom tools can be added to extend functionality. See `js/tools/README.md` for implementation details.
+5. Open the settings at the top right, paste your API key, and click "Save"
+6. Get free API key from [Deepgram](https://deepgram.com/pricing) and paste in the settings to get real-time transcript (Optional).
 
 ## Contributing
 

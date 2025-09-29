@@ -4,47 +4,53 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Gemini Live</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
         <link rel="stylesheet" href="css/styles.css" />
     </head>
     <body>
         <div class="app-container">
-            <button id="disconnectBtn" class="disconnect-btn">
-                Disconnect
-            </button>
-            <button id="connectBtn" class="connect-btn" style="display: none">
-                Connect
-            </button>
-            <button id="settingsBtn" class="settings-btn">⚙️</button>
-            <button id="cameraBtn" class="camera-btn">
-                <span class="camera-icon">📷</span>
-            </button>
-            <button id="screenBtn" class="screen-btn">
-                <span class="screen-icon">🖥️</span>
-            </button>
-            <div class="task-toggle">
-                <label class="switch">
-                    <input type="checkbox" id="taskSwitch" />
-                    <span class="slider round"></span>
-                </label>
-                <span id="taskLabel">Transcribe</span>
+            <!-- Top Bar for settings -->
+            <div class="top-bar">
+                <button id="settingsBtn" class="settings-btn" title="Settings">⚙️</button>
             </div>
-            <button id="systemAudioBtn" class="system-audio-btn">🖥️</button>
-            <button id="micBtn" class="mic-btn">
-                <span class="mic-icon">🎤</span>
-            </button>
+
+            <!-- Chat History -->
             <div id="chatHistory" class="chat-history"></div>
+
+            <!-- Bottom Container for input and controls -->
+            <div class="bottom-container">
+                <div class="text-input-container">
+                    <input
+                        type="text"
+                        id="messageInput"
+                        placeholder="Type your message..."
+                        class="text-input"
+                    />
+                    <div class="control-buttons">
+                        <button id="sendBtn" class="send-btn" title="Send">➤</button>
+                        <button id="systemAudioBtn" class="system-audio-btn" title="Record System Audio">🖥️</button>
+                        <button id="micBtn" class="mic-btn" title="Record Microphone">🎤</button>
+                    </div>
+                </div>
+                <div class="task-toggle">
+                    <label class="switch">
+                        <input type="checkbox" id="taskSwitch" />
+                        <span class="slider"></span>
+                    </label>
+                    <span id="taskLabel">Transcribe</span>
+                </div>
+            </div>
+
+            <!-- Hidden elements -->
+            <button id="disconnectBtn" class="disconnect-btn">Disconnect</button>
+            <button id="connectBtn" class="connect-btn" style="display: none">Connect</button>
+            <button id="cameraBtn" class="camera-btn"><span class="camera-icon">📷</span></button>
+            <button id="screenBtn" class="screen-btn"><span class="screen-icon">🖥️</span></button>
             <canvas id="visualizer" class="visualizer"></canvas>
             <div id="cameraPreview" class="camera-preview"></div>
             <div id="screenPreview" class="screen-preview"></div>
-            <div class="text-input-container">
-                <input
-                    type="text"
-                    id="messageInput"
-                    placeholder="Type your message..."
-                    class="text-input"
-                />
-                <button id="sendBtn" class="send-btn">➤</button>
-            </div>
         </div>
         <script type="module" src="js/script.js"></script>
     </body>

@@ -24,67 +24,78 @@ export function setupEventListeners(apiClient, chatManager) {
     });
 
     // --- Audio Recording Logic ---
-    const startRecording = async (sourceType) => {
-        if (recorder.isRecording) return;
-        try {
-            await recorder.start(sourceType);
-            elements.micBtn.classList.add('recording');
-            elements.systemAudioBtn.classList.add('recording');
-            chatManager.addSystemMessage(
-                `Recording from ${sourceType} started...`,
-            );
-        } catch (error) {
-            chatManager.addSystemMessage(
-                `Error starting recording: ${error.message}`,
-            );
+    const handleRecording = async (sourceType) => {
+        if (recorder.isRecording) {
+            recorder.stop();
+            elements.micBtn.classList.remove('recording');
+            elements.systemAudioBtn.classList.remove('recording');
+            chatManager.addSystemMessage('Recording stopped.');
+        } else {
+            try {
+                await recorder.start(sourceType);
+                elements.micBtn.classList.add('recording');
+                elements.systemAudioBtn.classList.add('recording');
+                chatManager.addSystemMessage(
+                    `Recording from ${sourceType} started...`
+                );
+            } catch (error) {
+                chatManager.addSystemMessage(
+                    `Error starting recording: ${error.message}`
+                );
+            }
         }
     };
 
-    const stopRecordingAndProcess = async () => {
-        if (!recorder.isRecording) return;
+    // --- API Request Queue ---
+    const apiQueue = [];
+    let isProcessingQueue = false;
 
-        elements.micBtn.classList.remove('recording');
-        elements.systemAudioBtn.classList.remove('recording');
+    const processQueue = async () => {
+        if (isProcessingQueue || apiQueue.length === 0) {
+            return;
+        }
+        isProcessingQueue = true;
 
-        const isTranslation = taskSwitch.checked;
-        chatManager.addSystemMessage(
-            `Recording stopped. ${
-                isTranslation ? 'Translating' : 'Transcribing'
-            }...`,
-        );
+        const { audioBlob, isTranslation } = apiQueue.shift();
 
         try {
-            const audioBlob = await recorder.stop();
             let resultText;
-
             if (isTranslation) {
                 const targetLanguage =
                     localStorage.getItem('targetLanguage') || 'Chinese';
                 resultText = await apiClient.translateAudio(
                     audioBlob,
-                    targetLanguage,
+                    targetLanguage
                 );
             } else {
                 resultText = await apiClient.transcribe(audioBlob);
             }
-
-            chatManager.addUserMessage(resultText);
+            chatManager.addBotMessage(resultText);
         } catch (error) {
             chatManager.addSystemMessage(`Processing failed: ${error.message}`);
+        } finally {
+            isProcessingQueue = false;
+            processQueue(); // Process next item in the queue
         }
     };
 
-    elements.micBtn.addEventListener('click', () => {
-        recorder.isRecording
-            ? stopRecordingAndProcess()
-            : startRecording('mic');
+    recorder.addEventListener('audioChunkReady', (event) => {
+        const audioBlob = event.detail;
+        const isTranslation = taskSwitch.checked;
+        
+        // Add the new chunk to the queue
+        apiQueue.push({ audioBlob, isTranslation });
+        
+        // Start processing the queue if it's not already running
+        if (!isProcessingQueue) {
+            processQueue();
+        }
     });
 
-    elements.systemAudioBtn.addEventListener('click', () => {
-        recorder.isRecording
-            ? stopRecordingAndProcess()
-            : startRecording('display');
-    });
+    elements.micBtn.addEventListener('click', () => handleRecording('mic'));
+    elements.systemAudioBtn.addEventListener('click', () =>
+        handleRecording('display')
+    );
 
     // --- Text Input and Send Button (for testing) ---
     const sendMessage = async () => {

@@ -1,31 +1,104 @@
 export const settingsTemplate = `
 <div class="settings-group">
-    <label for="proxyUrl">API Proxy URL</label>
-    <input type="text" id="proxyUrl" placeholder="e.g., https://api.openai.com/v1">
+    <label for="apiKey">Gemini API Key</label>
+    <input type="password" id="apiKey" placeholder="Enter your Gemini API key">
 </div>
 
 <div class="settings-group">
-    <label for="apiKey">API Key</label>
-    <input type="password" id="apiKey" placeholder="Enter your API key">
-</div>
-
-<hr>
-
-<div class="settings-group">
-    <label for="transcriptionModel">Transcription Model</label>
-    <input type="text" id="transcriptionModel" placeholder="e.g., whisper-1">
-</div>
-
-
-<div class="settings-group">
-    <label for="translationModel">Translation Model</label>
-    <input type="text" id="translationModel" placeholder="e.g., gpt-3.5-turbo">
+    <label for="deepgramApiKey">Deepgram API Key (Optional)</label>
+    <input type="password" id="deepgramApiKey" placeholder="Enter your Deepgram API key">
 </div>
 
 <div class="settings-group">
-    <label for="targetLanguage">Target Language (for Translation)</label>
-    <input type="text" id="targetLanguage" placeholder="e.g., Chinese">
+    <label for="voice">Voice</label>
+    <select id="voice">
+        <option value="Puck">Puck</option>
+        <option value="Charon">Charon</option>
+        <option value="Kore">Kore</option>
+        <option value="Fenrir">Fenrir</option>
+        <option value="Aoede">Aoede</option>
+    </select>
 </div>
 
-<button id="settingsSaveBtn" class="settings-save-btn">Save Settings</button>
-`;
+<div class="settings-group">
+    <label for="sampleRate">Sample Rate</label>
+    <input type="range" id="sampleRate" min="8000" max="48000" step="1000">
+    <span id="sampleRateValue"></span>
+</div>
+
+<div class="settings-group">
+    <div class="collapsible" id="systemInstructionsToggle">System Instructions ▼</div>
+    <div class="collapsible-content">
+        <textarea id="systemInstructions" rows="4" placeholder="Enter system instructions"></textarea>
+    </div>
+</div>
+
+<div class="settings-group">
+    <div class="collapsible" id="screenCameraToggle">Screen&Camera ▼</div>
+    <div class="collapsible-content">
+        <div class="settings-group">
+            <label for="fps">FPS (1-10)</label>
+            <input type="range" id="fps" min="1" max="10" step="1">
+            <span id="fpsValue"></span>
+        </div>
+        <div class="settings-group">
+            <label for="resizeWidth">Resize Width (640-1920)</label>
+            <input type="range" id="resizeWidth" min="640" max="1920" step="80">
+            <span id="resizeWidthValue"></span>
+        </div>
+        <div class="settings-group">
+            <label for="quality">Quality (0.1-1)</label>
+            <input type="range" id="quality" min="0.1" max="1" step="0.1">
+            <span id="qualityValue"></span>
+        </div>
+    </div>
+</div>
+
+<div class="settings-group">
+    <div class="collapsible" id="advancedToggle">Advanced Settings ▼</div>
+    <div class="collapsible-content">
+        <div class="settings-group">
+            <label for="temperature">Temperature (0-2)</label>
+            <input type="range" id="temperature" min="0" max="2" step="0.1">
+            <span id="temperatureValue"></span>
+        </div>
+        <div class="settings-group">
+            <label for="topP">Top P (0-1)</label>
+            <input type="range" id="topP" min="0" max="1" step="0.05">
+            <span id="topPValue"></span>
+        </div>
+        <div class="settings-group">
+            <label for="topK">Top K (1-100)</label>
+            <input type="range" id="topK" min="1" max="100" step="1">
+            <span id="topKValue"></span>
+        </div>
+    </div>
+</div>
+
+<div class="settings-group">
+    <div class="collapsible" id="safetyToggle">Safety Settings (Blocking Strength) ▼</div>
+    <div class="collapsible-content">
+        <div class="settings-group">
+            <label for="harassmentThreshold">Harassment (0-3)</label>
+            <input type="range" id="harassmentThreshold" min="0" max="3" step="1">
+            <span id="harassmentValue"></span>
+        </div>
+        <div class="settings-group">
+            <label for="dangerousContentThreshold">Dangerous Content (0-3)</label>
+            <input type="range" id="dangerousContentThreshold" min="0" max="3" step="1">
+            <span id="dangerousValue"></span>
+        </div>
+        <div class="settings-group">
+            <label for="sexuallyExplicitThreshold">Sexually Explicit (0-3)</label>
+            <input type="range" id="sexuallyExplicitThreshold" min="0" max="3" step="1">
+            <span id="sexualValue"></span>
+        </div>
+        <div class="settings-group">
+            <label for="civicIntegrityThreshold">Civic Integrity (0-3)</label>
+            <input type="range" id="civicIntegrityThreshold" min="0" max="3" step="1">
+            <span id="civicValue"></span>
+        </div>
+    </div>
+</div>
+
+<button id="settingsSaveBtn" class="settings-save-btn">Save Settings</button>`; 

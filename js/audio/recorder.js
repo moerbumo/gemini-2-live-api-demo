@@ -1,161 +1,140 @@
-import { toWav } from '../utils/wav-encoder.js';
+import { arrayBufferToBase64 } from '../utils/utils.js';
 
 /**
- * Manages audio recording and processing using a dedicated AudioWorklet.
- * This class is responsible for:
- * - Acquiring audio streams from microphone or display.
- * - Loading and managing the 'intelligent-slicer' AudioWorklet.
- * - Receiving audio chunks from the worklet.
- * - Converting the raw Int16 audio data into a WAV file Blob.
- * - Emitting events when a new audio chunk is ready for processing.
+ * AudioRecorder manages the capture and processing of audio input from the user's microphone.
+ * It uses the Web Audio API and AudioWorklet to process audio in real-time with minimal latency.
+ * The processed audio is converted to base64-encoded Int16 format suitable for transmission.
  */
 export class AudioRecorder extends EventTarget {
+    /**
+     * Creates an AudioRecorder instance
+     */
     constructor() {
         super();
-        this.audioContext = null;
-        this.stream = null;
-        this.workletNode = null;
-        this.isRecording = false;
+        // Core audio configuration
+        this.sampleRate = 16000;         // Sample rate in Hz   
+        this.stream = null;              // MediaStream from getUserMedia
+        this.audioContext = null;        // AudioContext for Web Audio API
+        this.source = null;              // MediaStreamAudioSourceNode
+        this.processor = null;           // AudioWorkletNode for processing
+        this.onAudioData = null;         // Callback for processed audio chunks
+        this.isRecording = false;        // Recording state flag
+        this.isSuspended = false;        // Mic suspension state
     }
 
     /**
-     * Starts the audio recording and processing pipeline.
-     * @param {'mic' | 'display'} sourceType - The source of the audio.
+     * Initializes and starts audio capture pipeline
+     * Sets up audio context, worklet processor, and media stream
+     * @param {Function} onAudioData - Callback receiving base64-encoded audio chunks
      */
-    async start(sourceType = 'mic') {
-        if (this.isRecording) {
-            console.warn('Recording is already in progress.');
-            return;
-        }
-
+    async start(onAudioData) {
+        this.onAudioData = onAudioData;
         try {
-            // 1. Get Audio Stream
-            this.stream = await this._getAudioStream(sourceType);
+            // Request microphone access with specific echo cancelation and noise reduction
+            this.stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    channelCount: 1,
+                    sampleRate: this.sampleRate,
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                } 
+            });
+            
+            // Initialize Web Audio API context and nodes
+            this.audioContext = new AudioContext({ sampleRate: this.sampleRate });
+            this.source = this.audioContext.createMediaStreamSource(this.stream);
 
-            // 2. Setup Audio Context and Worklet
-            if (!this.audioContext) {
-                this.audioContext = new AudioContext({
-                    sampleRate: 16000, // Set target sample rate
-                });
-            }
-            // Resume context if it's suspended
-            if (this.audioContext.state === 'suspended') {
-                await this.audioContext.resume();
-            }
-
-            await this.audioContext.audioWorklet.addModule(
-                'js/audio/worklets/intelligent-slicer.js'
-            );
-
-            // 3. Create Audio Pipeline
-            const source = this.audioContext.createMediaStreamSource(this.stream);
-            this.workletNode = new AudioWorkletNode(
-                this.audioContext,
-                'intelligent-slicer-processor'
-            );
-
-            // Connect the source to the worklet node.
-            source.connect(this.workletNode);
-            // Note: We don't connect to the destination, as we only want to process the audio, not play it.
-
-            // 4. Listen for messages from the Worklet
-            this.workletNode.port.onmessage = (event) => {
-                if (event.data.event === 'audioChunk') {
-                    this._handleAudioChunk(event.data.data);
-                } else if (event.data.event === 'debug') {
-                    console.log('Worklet Debug:', event.data.message);
+            // Load and initialize audio processing worklet
+            await this.audioContext.audioWorklet.addModule('js/audio/worklets/audio-processor.js');
+            this.processor = new AudioWorkletNode(this.audioContext, 'audio-recorder-worklet');
+            
+            // Handle processed audio chunks from worklet
+            this.processor.port.onmessage = (event) => {
+                if (!this.isRecording) return;
+                
+                if (event.data.event === 'chunk' && this.onAudioData) {
+                    const base64Data = arrayBufferToBase64(event.data.data.int16arrayBuffer);
+                    this.onAudioData(base64Data);
                 }
             };
 
+            // Connect audio processing pipeline
+            this.source.connect(this.processor);
+            this.processor.connect(this.audioContext.destination);
             this.isRecording = true;
-            console.info(`Audio recording started from ${sourceType}.`);
         } catch (error) {
-            console.error('Failed to start audio recording:', error);
-            this.stop(); // Clean up any resources
-            throw new Error('Failed to start audio recording: ' + error.message);
+            throw new Error('Failed to start audio recording:' + error);
         }
     }
 
     /**
-     * Stops the audio recording and cleans up all resources.
+     * Gracefully stops audio recording and cleans up resources
+     * Stops media tracks and logs the operation completion
      */
     stop() {
-        if (!this.isRecording && !this.stream) {
-            return;
-        }
+        try {
+            if (!this.isRecording) {
+                return;
+            }
 
-        // Send a stop command to the worklet to flush any remaining audio data.
-        if (this.workletNode) {
-            this.workletNode.port.postMessage({ command: 'stop' });
-        }
+            // Stop all active media tracks
+            if (this.stream) {
+                this.stream.getTracks().forEach(track => track.stop());
+                this.stream = null;
+            }
 
-        if (this.stream) {
-            this.stream.getTracks().forEach((track) => track.stop());
-            this.stream = null;
-        }
+            this.isRecording = false;
+            console.info('Audio recording stopped');
 
-        if (this.workletNode) {
-            // We delay the disconnection to allow the final message to be processed.
-            setTimeout(() => {
-                this.workletNode.port.onmessage = null;
-                this.workletNode.disconnect();
-                this.workletNode = null;
-            }, 500);
+            if (this.audioContext) {
+                this.audioContext.close();
+            }
+        } catch (error) {
+            throw new Error('Failed to stop audio recording:' + error);
         }
-
-        if (this.audioContext && this.audioContext.state !== 'closed') {
-            // Don't close the context immediately to allow any pending operations to finish.
-            // It can be reused for the next recording session.
-        }
-
-        this.isRecording = false;
-        console.info('Audio recording stopped.');
     }
 
     /**
-     * Handles the 'audioChunk' message from the worklet.
-     * Converts the Int16Array data to a WAV Blob and dispatches an event.
-     * @param {Int16Array} int16Array - The raw audio data from the worklet.
+     * Suspends microphone input without destroying the audio context
      */
-    _handleAudioChunk(int16Array) {
-        const wavBlob = toWav(int16Array, 1, this.audioContext.sampleRate);
-        this.dispatchEvent(
-            new CustomEvent('audioChunkReady', { detail: wavBlob })
-        );
+    async suspendMic() {
+        if (!this.isRecording || this.isSuspended) return;
+        
+        try {
+            await this.audioContext.suspend();
+            this.stream.getTracks().forEach(track => track.enabled = false);
+            this.isSuspended = true;
+            console.info('Microphone suspended');
+        } catch (error) {
+            throw new Error('Failed to suspend microphone:' + error);
+        }
     }
 
     /**
-     * Acquires the appropriate audio stream based on the source type.
-     * @param {'mic' | 'display'} sourceType - The desired audio source.
-     * @returns {Promise<MediaStream>} A promise that resolves with the audio MediaStream.
+     * Resumes microphone input if previously suspended
      */
-    async _getAudioStream(sourceType) {
-        switch (sourceType) {
-            case 'mic':
-                return navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        sampleRate: 16000, // Request a specific sample rate
-                        noiseSuppression: true,
-                        echoCancellation: true,
-                    },
-                });
-            case 'display':
-                const displayStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: true,
-                    audio: true,
-                });
-                const audioTrack = displayStream.getAudioTracks()[0];
-                if (!audioTrack) {
-                    displayStream.getTracks().forEach((track) => track.stop());
-                    throw new Error('No audio track found in the selected display source.');
-                }
-                // When the audio track ends (e.g., user stops sharing), stop the video track too.
-                audioTrack.onended = () => {
-                    displayStream.getVideoTracks().forEach((track) => track.stop());
-                };
-                return new MediaStream([audioTrack]);
-            default:
-                throw new Error(`Invalid source type: ${sourceType}`);
+    async resumeMic() {
+        if (!this.isRecording || !this.isSuspended) return;
+        
+        try {
+            await this.audioContext.resume();
+            this.stream.getTracks().forEach(track => track.enabled = true);
+            this.isSuspended = false;
+            console.info('Microphone resumed');
+        } catch (error) {
+            throw new Error('Failed to resume microphone:' + error);
+        }
+    }
+
+    /**
+     * Toggles microphone state between suspended and active
+     */
+    async toggleMic() {
+        if (this.isSuspended) {
+            await this.resumeMic();
+        } else {
+            await this.suspendMic();
         }
     }
 }

@@ -4,7 +4,6 @@ const elements = {
     disconnectBtn: document.getElementById('disconnectBtn'),
     connectBtn: document.getElementById('connectBtn'),
     micBtn: document.getElementById('micBtn'),
-    systemAudioBtn: document.getElementById('systemAudioBtn'),
     cameraBtn: document.getElementById('cameraBtn'),
     screenBtn: document.getElementById('screenBtn'),
     settingsBtn: document.getElementById('settingsBtn'),
@@ -18,7 +17,7 @@ const elements = {
     sendBtn: document.getElementById('sendBtn'),
 
     // Visualizer canvas
-    visualizerCanvas: document.getElementById('visualizer'),
+    visualizerCanvas: document.getElementById('visualizer')
 };
 
 export default elements;

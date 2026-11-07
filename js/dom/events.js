@@ -1,131 +1,149 @@
 import elements from './elements.js';
 import settingsManager from '../settings/settings-manager.js';
-import { AudioRecorder } from '../audio/recorder.js';
 
-export function setupEventListeners(apiClient, chatManager) {
-    const recorder = new AudioRecorder();
-    const taskSwitch = document.getElementById('taskSwitch');
-    const taskLabel = document.getElementById('taskLabel');
-
-    // --- Top Bar Buttons ---
-    elements.settingsBtn.addEventListener('click', () =>
-        settingsManager.show(),
-    );
-
-    // Hide unused buttons
-    elements.cameraBtn.style.display = 'none';
-    elements.screenBtn.style.display = 'none';
-    elements.disconnectBtn.style.display = 'none';
+/**
+ * Updates UI to show disconnect button and hide connect button
+ */
+const showDisconnectButton = () => {
     elements.connectBtn.style.display = 'none';
+    elements.disconnectBtn.style.display = 'block';
+};
 
-    // --- Task Toggle Switch ---
-    taskSwitch.addEventListener('change', () => {
-        taskLabel.textContent = taskSwitch.checked ? 'Translate' : 'Transcribe';
+/**
+ * Updates UI to show connect button and hide disconnect button
+ */
+const showConnectButton = () => {
+    elements.disconnectBtn.style.display = 'none';
+    elements.connectBtn.style.display = 'block';
+};
+
+let isCameraActive = false;
+
+/**
+ * Ensures the agent is connected and initialized
+ * @param {GeminiAgent} agent - The main application agent instance
+ * @returns {Promise<void>}
+ */
+const ensureAgentReady = async (agent) => {
+    if (!agent.connected) {
+        await agent.connect();
+        showDisconnectButton();
+    }
+    if (!agent.initialized) {
+        await agent.initialize();
+    }
+};
+
+/**
+ * Sets up event listeners for the application's UI elements
+ * @param {GeminiAgent} agent - The main application agent instance
+ */
+export function setupEventListeners(agent) {
+    // Disconnect handler
+    elements.disconnectBtn.addEventListener('click', async () => {
+        try {
+            await agent.disconnect();
+            showConnectButton();
+            [elements.cameraBtn, elements.screenBtn, elements.micBtn].forEach(btn => btn.classList.remove('active'));
+            isCameraActive = false;
+        } catch (error) {
+            console.error('Error disconnecting:', error);
+        }
     });
 
-    // --- Audio Recording Logic ---
-    const handleRecording = async (sourceType) => {
-        if (recorder.isRecording) {
-            recorder.stop();
-            elements.micBtn.classList.remove('recording');
-            elements.systemAudioBtn.classList.remove('recording');
-            chatManager.addSystemMessage('Recording stopped.');
-        } else {
-            try {
-                await recorder.start(sourceType);
-                elements.micBtn.classList.add('recording');
-                elements.systemAudioBtn.classList.add('recording');
-                chatManager.addSystemMessage(
-                    `Recording from ${sourceType} started...`
-                );
-            } catch (error) {
-                chatManager.addSystemMessage(
-                    `Error starting recording: ${error.message}`
-                );
-            }
-        }
-    };
-
-    // --- API Request Queue ---
-    const apiQueue = [];
-    let isProcessingQueue = false;
-
-    const processQueue = async () => {
-        if (isProcessingQueue || apiQueue.length === 0) {
-            return;
-        }
-        isProcessingQueue = true;
-
-        const { audioBlob, isTranslation } = apiQueue.shift();
-
+    // Connect handler
+    elements.connectBtn.addEventListener('click', async () => {
         try {
-            let resultText;
-            if (isTranslation) {
-                const targetLanguage =
-                    localStorage.getItem('targetLanguage') || 'Chinese';
-                resultText = await apiClient.translateAudio(
-                    audioBlob,
-                    targetLanguage
-                );
+            await ensureAgentReady(agent);
+        } catch (error) {
+            console.error('Error connecting:', error);
+        }
+    });
+
+    // Microphone toggle handler
+    elements.micBtn.addEventListener('click', async () => {
+        try {
+            await ensureAgentReady(agent);
+            await agent.toggleMic();
+            elements.micBtn.classList.toggle('active');
+        } catch (error) {
+            console.error('Error toggling microphone:', error);
+            elements.micBtn.classList.remove('active');
+        }
+    });
+
+    // Camera toggle handler
+    elements.cameraBtn.addEventListener('click', async () => {
+        try {
+            await ensureAgentReady(agent);
+            
+            if (!isCameraActive) {
+                await agent.startCameraCapture();
+                elements.cameraBtn.classList.add('active');
             } else {
-                resultText = await apiClient.transcribe(audioBlob);
+                await agent.stopCameraCapture();
+                elements.cameraBtn.classList.remove('active');
             }
-            chatManager.addBotMessage(resultText);
+            isCameraActive = !isCameraActive;
         } catch (error) {
-            chatManager.addSystemMessage(`Processing failed: ${error.message}`);
-        } finally {
-            isProcessingQueue = false;
-            processQueue(); // Process next item in the queue
-        }
-    };
-
-    recorder.addEventListener('audioChunkReady', (event) => {
-        const audioBlob = event.detail;
-        const isTranslation = taskSwitch.checked;
-        
-        // Add the new chunk to the queue
-        apiQueue.push({ audioBlob, isTranslation });
-        
-        // Start processing the queue if it's not already running
-        if (!isProcessingQueue) {
-            processQueue();
+            console.error('Error toggling camera:', error);
+            elements.cameraBtn.classList.remove('active');
+            isCameraActive = false;
         }
     });
 
-    elements.micBtn.addEventListener('click', () => handleRecording('mic'));
-    elements.systemAudioBtn.addEventListener('click', () =>
-        handleRecording('display')
-    );
+    // Screen sharing handler
+    let isScreenShareActive = false;
+    
+    // Listen for screen share stopped events (from native browser controls)
+    agent.on('screenshare_stopped', () => {
+        elements.screenBtn.classList.remove('active');
+        isScreenShareActive = false;
+        console.info('Screen share stopped');
+    });
 
-    // --- Text Input and Send Button (for testing) ---
-    const sendMessage = async () => {
-        const text = elements.messageInput.value.trim();
-        if (!text) return;
-
-        chatManager.addUserMessage(text);
-        elements.messageInput.value = '';
-
+    elements.screenBtn.addEventListener('click', async () => {
         try {
-            const targetLanguage =
-                localStorage.getItem('targetLanguage') || 'Chinese';
-            // For text translation, we can't know the source, so we let the model figure it out.
-            const responseText = await apiClient.translate(
-                text,
-                targetLanguage,
-                'auto-detected',
-            );
-            chatManager.addBotMessage(responseText);
+            await ensureAgentReady(agent);
+            
+            if (!isScreenShareActive) {
+                await agent.startScreenShare();
+                elements.screenBtn.classList.add('active');
+            } else {
+                await agent.stopScreenShare();
+                elements.screenBtn.classList.remove('active');
+            }
+            isScreenShareActive = !isScreenShareActive;
         } catch (error) {
-            chatManager.addSystemMessage(
-                `Chat request failed: ${error.message}`,
-            );
+            console.error('Error toggling screen share:', error);
+            elements.screenBtn.classList.remove('active');
+            isScreenShareActive = false;
+        }
+    });
+
+    // Message sending handlers
+    const sendMessage = async () => {
+        try {
+            await ensureAgentReady(agent);
+            const text = elements.messageInput.value.trim();
+            await agent.sendText(text);
+            elements.messageInput.value = '';
+        } catch (error) {
+            console.error('Error sending message:', error);
         }
     };
 
     elements.sendBtn.addEventListener('click', sendMessage);
-    elements.messageInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
+    elements.messageInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
             sendMessage();
         }
     });
+
+    // Settings button click
+    elements.settingsBtn.addEventListener('click', () => settingsManager.show());
 }
+
+// Initialize settings
+settingsManager;
